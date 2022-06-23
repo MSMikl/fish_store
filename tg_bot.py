@@ -7,7 +7,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Filters, Updater, CallbackContext
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
-from shop import get_products_list, start_auth
+from shop import get_products, start_auth
 
 
 DB = None
@@ -16,7 +16,7 @@ BASE_URL = 'https://api.moltin.com'
 
 
 def start(update: Update, context: CallbackContext):
-    products = get_products_list(STORE_TOKEN, BASE_URL)
+    products = get_products(STORE_TOKEN, BASE_URL)
     keyboard = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])]
         for product in products['data']
@@ -26,18 +26,22 @@ def start(update: Update, context: CallbackContext):
         text='Приветствуем в рыбном магазине. Выберите опцию:',
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
-    return 'ECHO'
+    return 'INITIAL_CHOICE'
 
 
 def button(update: Update, context: CallbackContext):
     query = update.callback_query
+    product = get_products(STORE_TOKEN, BASE_URL, query.data)['data']
+    text = f"""Вы выбрали {product['name']}
+    {product['description']}
+    Всего за {product['price'][0]['amount']/100} долларов"""
     context.bot.edit_message_text(
-        text=f"Вы выбрали вариант {query.data}",
+        text=text,
         chat_id=query.message.chat_id,
         message_id=query.message.message_id
 
     )
-    return 'ECHO'
+    return 'HANDLE_MENU'
 
 
 def echo(update: Update, context: CallbackContext):
@@ -78,7 +82,7 @@ def user_input_handler(update: Update, context: CallbackContext):
 
     states_function = {
         'START': start,
-        'ECHO': button
+        'INITIAL_CHOICE': button
     }
 
     state_handler = states_function[user_state]
