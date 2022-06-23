@@ -15,7 +15,7 @@ def start(update: Updater, context: CallbackContext):
     return 'ECHO'
 
 
-def echo(update: Updater):
+def echo(update: Updater, context: CallbackContext):
     update.message.reply_text(text=update.message.text)
     return 'ECHO'
 
@@ -30,7 +30,7 @@ def get_db_connection():
             host=db_host,
             port=db_port,
             password=db_pass,
-            db=1
+            db=0
         )
     return DB
 
@@ -57,7 +57,7 @@ def user_input_handler(update: Updater, context: CallbackContext):
     }
 
     state_handler = states_function[user_state]
-    
+
     next_state = state_handler(update, context)
     db.set(chat_id, next_state)
 
