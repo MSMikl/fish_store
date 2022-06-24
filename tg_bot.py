@@ -25,15 +25,15 @@ def start(update: Update, context: CallbackContext):
         [InlineKeyboardButton(product['name'], callback_data=product['id'])]
         for product in products['data']
     ] + [[InlineKeyboardButton('Моя корзина', callback_data='show_cart')]]
-    message = update.message or update.callback_query.message
-    context.bot.delete_message(
-        chat_id=message.chat_id,
-        message_id=message.message_id
-    )
     context.bot.send_message(
         chat_id=update.effective_chat.id,
         text='Приветствуем в рыбном магазине. Выберите опцию:',
         reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    message = update.effective_message
+    context.bot.delete_message(
+        chat_id=message.chat_id,
+        message_id=message.message_id
     )
     return 'INITIAL_CHOICE'
 
@@ -51,10 +51,6 @@ def button(update: Update, context: CallbackContext):
     {product['description']}
     Всего {product['price'][0]['amount']/100} долларов за 1 килограмм
     Сколько бы вы хотели купить?"""
-    context.bot.delete_message(
-        chat_id=query.message.chat_id,
-        message_id=query.message.message_id
-    )
     keyboard = [
         [
             InlineKeyboardButton('1 кг', callback_data=product['sku'] + '_1'),
@@ -83,6 +79,10 @@ def button(update: Update, context: CallbackContext):
             text=text,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+    context.bot.delete_message(
+        chat_id=query.message.chat_id,
+        message_id=query.message.message_id
+    )
     return 'HANDLE_MENU'
 
 
@@ -102,10 +102,6 @@ def handle_menu(update: Update, context: CallbackContext):
         sku=sku,
         quantity=int(quantity)
         )
-    context.bot.delete_message(
-        chat_id=query.message.chat_id,
-        message_id=query.message.message_id
-    )
     keyboard = [
         [InlineKeyboardButton('Оплатить', callback_data='pay')] if cart['total_price'] else None,
         [InlineKeyboardButton('Продолжить покупки', callback_data='continue')]
@@ -114,6 +110,10 @@ def handle_menu(update: Update, context: CallbackContext):
         chat_id=update.effective_chat.id,
         text="Отлично, добавили в корзину!\n" + make_cart_description(cart),
         reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    context.bot.delete_message(
+        chat_id=query.message.chat_id,
+        message_id=query.message.message_id
     )
     return 'HANDLE_MENU'
 
@@ -136,10 +136,6 @@ def show_cart(update: Update, context: CallbackContext):
         context.bot_data['base_url'],
         update.effective_chat.id
     )
-    context.bot.delete_message(
-        chat_id=update.callback_query.message.chat_id,
-        message_id=update.callback_query.message.message_id
-    )
     keyboard = [
         [InlineKeyboardButton(f"Убрать из корзины {item['name']}", callback_data=f"{item['id']}")]
         for item in cart.get('items')
@@ -152,10 +148,19 @@ def show_cart(update: Update, context: CallbackContext):
         text=make_cart_description(cart),
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+    context.bot.delete_message(
+        chat_id=update.callback_query.message.chat_id,
+        message_id=update.callback_query.message.message_id
+    )
     return 'HANDLE_CART'
 
 
 def payment(update: Update, context: CallbackContext):
+    message = update.effective_message
+    context.bot.delete_message(
+        chat_id=message.chat_id,
+        message_id=message.message_id
+    )
     context.bot.send_message(
         chat_id=update.effective_chat.id,
         text='Пожалуйста, оставьте свою почту, чтобы мы связались с вами по оплате'
