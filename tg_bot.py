@@ -15,12 +15,12 @@ from shop import get_products, start_auth, get_file_link, add_item_to_cart, get_
 
 
 DB = None
-STORE_TOKEN = None
-BASE_URL = 'https://api.moltin.com'
-
 
 def start(update: Update, context: CallbackContext):
-    products = get_products(STORE_TOKEN, BASE_URL)
+    products = get_products(
+        context.bot_data['store_token'],
+        context.bot_data['base_url']
+    )
     keyboard = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])]
         for product in products['data']
@@ -42,7 +42,11 @@ def button(update: Update, context: CallbackContext):
     query = update.callback_query
     if query.data == 'show_cart':
         return show_cart(update, context)
-    product = get_products(STORE_TOKEN, BASE_URL, query.data)['data']
+    product = get_products(
+        context.bot_data['store_token'],
+        context.bot_data['base_url'],
+        query.data
+    )['data']
     text = f"""Вы выбрали {product['name']}
     {product['description']}
     Всего {product['price'][0]['amount']/100} долларов за 1 килограмм
@@ -62,7 +66,11 @@ def button(update: Update, context: CallbackContext):
     ]
     image_meta = product.get('relationships', {0: 0}).get('main_image')
     if image_meta:
-        image = get_file_link(STORE_TOKEN, BASE_URL, image_meta['data']['id'])
+        image = get_file_link(
+            context.bot_data['store_token'],
+            context.bot_data['base_url'],
+            image_meta['data']['id']
+        )
         context.bot.send_photo(
             chat_id=query.message.chat_id,
             photo=image,
@@ -88,8 +96,8 @@ def handle_menu(update: Update, context: CallbackContext):
         return show_cart(update, context)
     sku, quantity = query.data.split('_')
     cart = add_item_to_cart(
-        STORE_TOKEN,
-        BASE_URL,
+        context.bot_data['store_token'],
+        context.bot_data['base_url'],
         cart_id=update.effective_chat.id,
         sku=sku,
         quantity=int(quantity)
@@ -123,7 +131,11 @@ def make_cart_description(cart):
 
 
 def show_cart(update: Update, context: CallbackContext):
-    cart = get_cart(STORE_TOKEN, BASE_URL, update.effective_chat.id)
+    cart = get_cart(
+        context.bot_data['store_token'],
+        context.bot_data['base_url'],
+        update.effective_chat.id
+    )
     context.bot.delete_message(
         chat_id=update.callback_query.message.chat_id,
         message_id=update.callback_query.message.message_id
@@ -159,7 +171,12 @@ def get_email(update: Update, context: CallbackContext):
         chat_id=update.effective_chat.id,
         text=f"Вы оставили почту {user_reply}"
     )
-    create_customer(STORE_TOKEN, BASE_URL, str(update.effective_chat.id), user_reply)
+    create_customer(
+        context.bot_data['store_token'],
+        context.bot_data['base_url'],
+        str(update.effective_chat.id),
+        user_reply
+    )
     return 'FINISH'
 
 
@@ -169,7 +186,12 @@ def handle_cart(update: Update, context: CallbackContext):
         return start(update, context)
     elif query.data == 'pay':
         return payment(update, context)
-    delete_item(STORE_TOKEN, BASE_URL, update.effective_chat.id, query.data)
+    delete_item(
+        context.bot_data['store_token'],
+        context.bot_data['base_url'],
+        update.effective_chat.id,
+        query.data
+    )
     return show_cart(update, context)
 
 
@@ -221,11 +243,14 @@ def user_input_handler(update: Update, context: CallbackContext):
 def main():
     load_dotenv()
     client_id = os.getenv('CLIENT_ID')
-    global STORE_TOKEN
-    STORE_TOKEN = start_auth(BASE_URL, client_id)
 
     tg_token = os.getenv('TG_TOKEN')
     updater = Updater(tg_token)
+    updater.dispatcher.bot_data['base_url'] = 'https://api.moltin.com'
+    updater.dispatcher.bot_data['store_token'] = start_auth(
+        updater.dispatcher.bot_data['base_url'],
+        client_id
+    )
 
     bot_commands = [
         ('start', 'Начать диалог')
