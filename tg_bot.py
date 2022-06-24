@@ -1,13 +1,15 @@
 import os
 import redis
 
+from pprint import pprint
+
 from dotenv import load_dotenv
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Filters, Updater, CallbackContext
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
-from shop import get_products, start_auth, get_file_link
+from shop import get_products, start_auth, get_file_link, create_cart, add_item_to_cart
 
 
 DB = None
@@ -22,7 +24,8 @@ def start(update: Update, context: CallbackContext):
         for product in products['data']
     ]
 
-    update.message.reply_text(
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
         text='Приветствуем в рыбном магазине. Выберите опцию:',
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -34,30 +37,75 @@ def button(update: Update, context: CallbackContext):
     product = get_products(STORE_TOKEN, BASE_URL, query.data)['data']
     text = f"""Вы выбрали {product['name']}
     {product['description']}
-    Всего за {product['price'][0]['amount']/100} долларов"""
+    Всего {product['price'][0]['amount']/100} долларов за 1 килограмм
+    Сколько бы вы хотели купить?"""
     context.bot.delete_message(
         chat_id=query.message.chat_id,
         message_id=query.message.message_id
     )
+    keyboard = [
+        [
+            InlineKeyboardButton('1 кг', callback_data=product['sku'] + '_1'),
+            InlineKeyboardButton('5 кг', callback_data=product['sku'] + '_5'),
+            InlineKeyboardButton('10 кг', callback_data=product['sku'] + '_10')
+        ],
+        [InlineKeyboardButton('Назад', callback_data='back')]
+    ]
     image_meta = product.get('relationships', {0: 0}).get('main_image')
     if image_meta:
         image = get_file_link(STORE_TOKEN, BASE_URL, image_meta['data']['id'])
         context.bot.send_photo(
             chat_id=query.message.chat_id,
             photo=image,
-            caption=text
+            caption=text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     else:
         context.bot.send_message(
             chat_id=query.message.chat_id,
-            text=text
+            text=text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     return 'HANDLE_MENU'
 
 
-def echo(update: Update, context: CallbackContext):
-    update.message.reply_text(text=update.message.text)
-    return 'ECHO'
+def handle_menu(update: Update, context: CallbackContext):
+    db = get_db_connection()
+    query = update.callback_query
+    if query.data == 'back':
+        return start(update, context)
+    sku, quantity = query.data.split('_')
+    cart_id = db.get(str(update.effective_chat.id) + 'cart')
+    print(cart_id)
+    if not cart_id:
+        cart_id = create_cart(
+            STORE_TOKEN,
+            BASE_URL,
+            str(update.effective_chat.id)
+        )
+        db.set(str(update.effective_chat.id) + 'cart', cart_id)
+    cart = add_item_to_cart(
+        STORE_TOKEN,
+        BASE_URL,
+        cart_id,
+        sku=sku,
+        quantity=int(quantity)
+        )
+    cart_content_text = ''
+    for item in cart.get('data'):
+        cart_content_text += (
+            f"\n{item['name']} {item['quantity']} кг - {item['meta']['display_price']['with_tax']['value']['formatted']}"
+        )
+    text = f"""Отлично, добавили в корзину.
+    Сейчас у вас в корзине:
+    {cart_content_text}
+    Общая цена {cart['meta']['display_price']['with_tax']['formatted']}
+    """
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text
+    )
+    return 'HANDLE_MENU'
 
 
 def get_db_connection():
@@ -93,7 +141,8 @@ def user_input_handler(update: Update, context: CallbackContext):
 
     states_function = {
         'START': start,
-        'INITIAL_CHOICE': button
+        'INITIAL_CHOICE': button,
+        'HANDLE_MENU': handle_menu
     }
 
     state_handler = states_function[user_state]

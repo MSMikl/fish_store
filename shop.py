@@ -16,9 +16,9 @@ def main():
     pprint.pprint(products)
     id = products['data'][0]['id']
     product = get_products(store_token, base_url, id)
-    print(get_file(store_token, base_url, product['data']['relationships']['main_image']['data']['id']))
+    print(get_file_link(store_token, base_url, product['data']['relationships']['main_image']['data']['id']))
     cart = create_cart(store_token, base_url, 'test_cart')
-    add_item_to_cart(store_token, base_url, cart, '10001', 2)
+    pprint.pprint(add_item_to_cart(store_token, base_url, cart, '10001', 2))
 
 
 def start_auth(url, client_id):
