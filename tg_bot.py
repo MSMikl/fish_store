@@ -9,7 +9,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Filters, Updater, CallbackContext
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
-from shop import get_products, start_auth, get_file_link, create_cart, add_item_to_cart
+from shop import get_products, start_auth, get_file_link, add_item_to_cart, get_cart, delete_item
 
 
 DB = None
@@ -22,8 +22,12 @@ def start(update: Update, context: CallbackContext):
     keyboard = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])]
         for product in products['data']
-    ]
-
+    ] + [[InlineKeyboardButton('Моя корзина', callback_data='show_cart')]]
+    message = update.message or update.callback_query.message
+    context.bot.delete_message(
+        chat_id=message.chat_id,
+        message_id=message.message_id
+    )
     context.bot.send_message(
         chat_id=update.effective_chat.id,
         text='Приветствуем в рыбном магазине. Выберите опцию:',
@@ -34,6 +38,8 @@ def start(update: Update, context: CallbackContext):
 
 def button(update: Update, context: CallbackContext):
     query = update.callback_query
+    if query.data == 'show_cart':
+        return show_cart(update, context)
     product = get_products(STORE_TOKEN, BASE_URL, query.data)['data']
     text = f"""Вы выбрали {product['name']}
     {product['description']}
@@ -49,7 +55,8 @@ def button(update: Update, context: CallbackContext):
             InlineKeyboardButton('5 кг', callback_data=product['sku'] + '_5'),
             InlineKeyboardButton('10 кг', callback_data=product['sku'] + '_10')
         ],
-        [InlineKeyboardButton('Назад', callback_data='back')]
+        [InlineKeyboardButton('Назад', callback_data='back')],
+        [InlineKeyboardButton('Моя корзина', callback_data='show_cart')]
     ]
     image_meta = product.get('relationships', {0: 0}).get('main_image')
     if image_meta:
@@ -70,42 +77,78 @@ def button(update: Update, context: CallbackContext):
 
 
 def handle_menu(update: Update, context: CallbackContext):
-    db = get_db_connection()
     query = update.callback_query
-    if query.data == 'back':
+    if query.data == 'back' or query.data == 'continue':
         return start(update, context)
+    elif query.data == 'pay':
+        return 'PAYMENT'
+    elif query.data == 'show_cart':
+        return show_cart(update, context)
     sku, quantity = query.data.split('_')
-    cart_id = db.get(str(update.effective_chat.id) + 'cart')
-    print(cart_id)
-    if not cart_id:
-        cart_id = create_cart(
-            STORE_TOKEN,
-            BASE_URL,
-            str(update.effective_chat.id)
-        )
-        db.set(str(update.effective_chat.id) + 'cart', cart_id)
     cart = add_item_to_cart(
         STORE_TOKEN,
         BASE_URL,
-        cart_id,
+        cart_id=update.effective_chat.id,
         sku=sku,
         quantity=int(quantity)
         )
-    cart_content_text = ''
-    for item in cart.get('data'):
-        cart_content_text += (
-            f"\n{item['name']} {item['quantity']} кг - {item['meta']['display_price']['with_tax']['value']['formatted']}"
-        )
-    text = f"""Отлично, добавили в корзину.
-    Сейчас у вас в корзине:
-    {cart_content_text}
-    Общая цена {cart['meta']['display_price']['with_tax']['formatted']}
-    """
+    context.bot.delete_message(
+        chat_id=query.message.chat_id,
+        message_id=query.message.message_id
+    )
+    keyboard = [
+        [InlineKeyboardButton('Оплатить', callback_data='pay')] if cart['total_price'] else None,
+        [InlineKeyboardButton('Продолжить покупки', callback_data='continue')]
+    ]
     context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=text
+        text="Отлично, добавили в корзину!\n" + make_cart_description(cart),
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
     return 'HANDLE_MENU'
+
+
+def make_cart_description(cart):
+    cart_content_text = '\n'.join([
+        f"{item['name']} {item['quantity']} кг - {item['unit_price']*item['quantity']}$"
+        for item in cart.get('items')
+    ])
+    text = f"""Сейчас у вас в корзине:
+{cart_content_text}
+Общая цена {cart.get('total_price', 0)}
+    """
+    return text
+
+
+def show_cart(update: Update, context: CallbackContext):
+    cart = get_cart(STORE_TOKEN, BASE_URL, update.effective_chat.id)
+    context.bot.delete_message(
+        chat_id=update.callback_query.message.chat_id,
+        message_id=update.callback_query.message.message_id
+    )
+    keyboard = [
+        [InlineKeyboardButton(f"Убрать из корзины {item['name']}", callback_data=f"{item['id']}")]
+        for item in cart.get('items')
+    ]
+    keyboard.append([InlineKeyboardButton('Продолжить покупки', callback_data='continue')])
+    if cart['total_price']:
+        keyboard.append([InlineKeyboardButton('Оплатить', callback_data='pay')])
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=make_cart_description(cart),
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+    return 'HANDLE_CART'
+
+
+def handle_cart(update: Update, context: CallbackContext):
+    query = update.callback_query
+    if query.data == 'continue':
+        return start(update, context)
+    elif query == 'pay':
+        return 'PAYMENT'
+    delete_item(STORE_TOKEN, BASE_URL, update.effective_chat.id, query.data)
+    return show_cart(update, context)
 
 
 def get_db_connection():
@@ -142,7 +185,8 @@ def user_input_handler(update: Update, context: CallbackContext):
     states_function = {
         'START': start,
         'INITIAL_CHOICE': button,
-        'HANDLE_MENU': handle_menu
+        'HANDLE_MENU': handle_menu,
+        'HANDLE_CART': handle_cart
     }
 
     state_handler = states_function[user_state]
