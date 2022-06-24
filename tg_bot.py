@@ -176,7 +176,7 @@ def payment(update: Update, context: CallbackContext):
 
 def get_email(update: Update, context: CallbackContext):
     user_reply = update.message.text
-    if not re.fullmatch("[^@]+@[^@]+\.[^@]+", user_reply):
+    if not re.fullmatch(r"[^@]+@[^@]+\.[^@]+", user_reply):
         return payment(update, context)
     context.bot.send_message(
         chat_id=update.effective_chat.id,
