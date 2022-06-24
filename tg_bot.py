@@ -7,7 +7,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Filters, Updater, CallbackContext
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
-from shop import get_products, start_auth
+from shop import get_products, start_auth, get_file_link
 
 
 DB = None
@@ -35,12 +35,23 @@ def button(update: Update, context: CallbackContext):
     text = f"""Вы выбрали {product['name']}
     {product['description']}
     Всего за {product['price'][0]['amount']/100} долларов"""
-    context.bot.edit_message_text(
-        text=text,
+    context.bot.delete_message(
         chat_id=query.message.chat_id,
         message_id=query.message.message_id
-
     )
+    image_meta = product.get('relationships', {0: 0}).get('main_image')
+    if image_meta:
+        image = get_file_link(STORE_TOKEN, BASE_URL, image_meta['data']['id'])
+        context.bot.send_photo(
+            chat_id=query.message.chat_id,
+            photo=image,
+            caption=text
+        )
+    else:
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=text
+        )
     return 'HANDLE_MENU'
 
 

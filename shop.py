@@ -15,7 +15,8 @@ def main():
     products = get_products(store_token, base_url)
     pprint.pprint(products)
     id = products['data'][0]['id']
-    print(get_products(store_token, base_url, id))
+    product = get_products(store_token, base_url, id)
+    print(get_file(store_token, base_url, product['data']['relationships']['main_image']['data']['id']))
     cart = create_cart(store_token, base_url, 'test_cart')
     add_item_to_cart(store_token, base_url, cart, '10001', 2)
 
@@ -34,9 +35,23 @@ def get_products(token, url, id=None):
     headers = {
         'Authorization': token
     }
-    response = requests.get(f'{url}/v2/products/{id if id else ""}', headers=headers)
+    response = requests.get(
+        f'{url}/v2/products/{id if id else ""}',
+        headers=headers
+    )
     response.raise_for_status()
     return response.json()
+
+
+def get_file_link(token, url, id):
+    headers = {
+        'Authorization': token
+    }
+    response = requests.get(
+        f"{url}/v2/files/{id}",
+        headers=headers
+    )
+    return response.json().get('data', {0: 0}).get('link', {0: 0}).get('href')
 
 
 def create_cart(token, url, cart_name):
@@ -74,7 +89,8 @@ def add_item_to_cart(token, url, cart_id, sku, quantity):
         headers=headers,
         json=data
     )
-    pprint.pprint(response.json())
+    response.raise_for_status()
+    return response.json()
 
 
 if __name__ == '__main__':
