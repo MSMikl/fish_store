@@ -36,6 +36,7 @@ def get_file_link(token, url, id):
         f"{url}/v2/files/{id}",
         headers=headers
     )
+    response.raise_for_status()
     return response.json().get('data', {0: 0}).get('link', {0: 0}).get('href')
 
 
