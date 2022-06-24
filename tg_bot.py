@@ -251,17 +251,21 @@ def user_input_handler(update: Update, context: CallbackContext):
     db.set(chat_id, next_state)
 
 
-def main():
-    load_dotenv()
+def refresh_token(context: CallbackContext):
     client_id = os.getenv('CLIENT_ID')
-
-    tg_token = os.getenv('TG_TOKEN')
-    updater = Updater(tg_token)
-    updater.dispatcher.bot_data['base_url'] = 'https://api.moltin.com'
-    updater.dispatcher.bot_data['store_token'] = get_auth_token(
-        updater.dispatcher.bot_data['base_url'],
+    context.bot_data['store_token'] = get_auth_token(
+        context.bot_data['base_url'],
         client_id
     )
+
+
+def main():
+    load_dotenv()
+    tg_token = os.getenv('TG_TOKEN')
+    updater = Updater(tg_token)
+    job_queue = updater.job_queue
+    updater.dispatcher.bot_data['base_url'] = 'https://api.moltin.com'
+    job_queue.run_repeating(refresh_token, interval=3600, first=1)
 
     bot_commands = [
         ('start', 'Начать диалог')
