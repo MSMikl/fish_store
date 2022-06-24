@@ -2,6 +2,7 @@ import os
 import re
 
 from pprint import pprint
+from textwrap import dedent
 
 import redis
 
@@ -47,10 +48,14 @@ def button(update: Update, context: CallbackContext):
         context.bot_data['base_url'],
         query.data
     )['data']
-    text = f"""Вы выбрали {product['name']}
-    {product['description']}
-    Всего {product['price'][0]['amount']/100} долларов за 1 килограмм
-    Сколько бы вы хотели купить?"""
+    text = dedent(
+        f"""
+        Вы выбрали {product['name']}
+        {product['description']}
+        Всего {product['price'][0]['amount']/100} долларов за 1 килограмм
+        Сколько бы вы хотели купить?
+        """
+    )
     keyboard = [
         [
             InlineKeyboardButton('1 кг', callback_data=product['sku'] + '_1'),
@@ -119,14 +124,15 @@ def handle_menu(update: Update, context: CallbackContext):
 
 
 def make_cart_description(cart):
-    cart_content_text = '\n'.join([
+    cart_content_text = '\n    '.join([
         f"{item['name']} {item['quantity']} кг - {item['unit_price']*item['quantity']}$"
         for item in cart.get('items')
     ])
-    text = f"""Сейчас у вас в корзине:
-{cart_content_text}
-Общая цена {cart.get('total_price', 0)}
-    """
+    text = dedent(f"""
+    Сейчас у вас в корзине:
+    {cart_content_text}
+    Общая цена {cart.get('total_price', 0)}
+    """)
     return text
 
 
