@@ -3,7 +3,7 @@ import os
 import requests
 
 
-def start_auth(url, client_id):
+def get_auth_token(url, client_id):
     data = {
         'client_id': client_id,
         'grant_type': 'implicit'

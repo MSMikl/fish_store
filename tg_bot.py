@@ -12,7 +12,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Filters, Updater, CallbackContext
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
-from shop import get_products, start_auth, get_file_link, add_item_to_cart, get_cart, delete_item, create_customer
+from shop import get_products, get_auth_token, get_file_link, add_item_to_cart, get_cart, delete_item, create_customer
 
 
 DB = None
@@ -258,7 +258,7 @@ def main():
     tg_token = os.getenv('TG_TOKEN')
     updater = Updater(tg_token)
     updater.dispatcher.bot_data['base_url'] = 'https://api.moltin.com'
-    updater.dispatcher.bot_data['store_token'] = start_auth(
+    updater.dispatcher.bot_data['store_token'] = get_auth_token(
         updater.dispatcher.bot_data['base_url'],
         client_id
     )
