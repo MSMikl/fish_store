@@ -1,7 +1,9 @@
 import os
-import redis
+import re
 
 from pprint import pprint
+
+import redis
 
 from dotenv import load_dotenv
 
@@ -81,7 +83,7 @@ def handle_menu(update: Update, context: CallbackContext):
     if query.data == 'back' or query.data == 'continue':
         return start(update, context)
     elif query.data == 'pay':
-        return 'PAYMENT'
+        return payment(update, context)
     elif query.data == 'show_cart':
         return show_cart(update, context)
     sku, quantity = query.data.split('_')
@@ -141,12 +143,30 @@ def show_cart(update: Update, context: CallbackContext):
     return 'HANDLE_CART'
 
 
+def payment(update: Update, context: CallbackContext):
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text='Пожалуйста, оставьте свою почту, чтобы мы связались с вами по оплате'
+    )
+    return 'WAITING_EMAIL'
+
+
+def get_email(update: Update, context: CallbackContext):
+    user_reply = update.message.text
+    if not re.fullmatch("[^@]+@[^@]+\.[^@]+", user_reply):
+        return payment(update, context)
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"Вы оставили почту {user_reply}"
+    )
+    return 'FINISH'
+
 def handle_cart(update: Update, context: CallbackContext):
     query = update.callback_query
     if query.data == 'continue':
         return start(update, context)
-    elif query == 'pay':
-        return 'PAYMENT'
+    elif query.data == 'pay':
+        return payment(update, context)
     delete_item(STORE_TOKEN, BASE_URL, update.effective_chat.id, query.data)
     return show_cart(update, context)
 
@@ -186,7 +206,8 @@ def user_input_handler(update: Update, context: CallbackContext):
         'START': start,
         'INITIAL_CHOICE': button,
         'HANDLE_MENU': handle_menu,
-        'HANDLE_CART': handle_cart
+        'HANDLE_CART': handle_cart,
+        'WAITING_EMAIL': get_email
     }
 
     state_handler = states_function[user_state]
