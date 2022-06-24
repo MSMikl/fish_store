@@ -6,20 +6,6 @@ import requests
 from dotenv import load_dotenv
 
 
-def main():
-    load_dotenv()
-    client_id = os.getenv('CLIENT_ID')
-    base_url = 'https://api.moltin.com'
-    store_token = start_auth(base_url, client_id)
-
-    products = get_products(store_token, base_url)
-    id = products['data'][0]['id']
-    product = get_products(store_token, base_url, id)
-    print(get_file_link(store_token, base_url, product['data']['relationships']['main_image']['data']['id']))
-    pprint.pprint(add_item_to_cart(store_token, base_url, 'any_id', '10001', 2))
-    pprint.pprint(get_cart(store_token, base_url, 'any_id'))
-
-
 def start_auth(url, client_id):
     data = {
         'client_id': client_id,
@@ -129,7 +115,3 @@ def create_customer(token, url, user_name, user_email):
     response = requests.post(f"{url}/v2/customers", headers=headers, json=data)
     response.raise_for_status()
     return response.json()
-
-
-if __name__ == '__main__':
-    main()
