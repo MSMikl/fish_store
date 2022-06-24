@@ -114,5 +114,22 @@ def extract_data_from_cart(full_cart_data):
     return result
 
 
+def create_customer(token, url, user_name, user_email):
+    headers = {
+        'Authorization': token,
+        'Content-Type': 'application/json'
+    }
+    data = {
+        'data': {
+            'type': 'customer',
+            'name': user_name,
+            'email': user_email
+        }
+    }
+    response = requests.post(f"{url}/v2/customers", headers=headers, json=data)
+    response.raise_for_status()
+    return response.json()
+
+
 if __name__ == '__main__':
     main()

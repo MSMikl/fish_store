@@ -11,7 +11,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Filters, Updater, CallbackContext
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 
-from shop import get_products, start_auth, get_file_link, add_item_to_cart, get_cart, delete_item
+from shop import get_products, start_auth, get_file_link, add_item_to_cart, get_cart, delete_item, create_customer
 
 
 DB = None
@@ -159,7 +159,9 @@ def get_email(update: Update, context: CallbackContext):
         chat_id=update.effective_chat.id,
         text=f"Вы оставили почту {user_reply}"
     )
+    create_customer(STORE_TOKEN, BASE_URL, str(update.effective_chat.id), user_reply)
     return 'FINISH'
+
 
 def handle_cart(update: Update, context: CallbackContext):
     query = update.callback_query
