@@ -256,7 +256,7 @@ def refresh_token(context: CallbackContext):
         context.bot_data['base_url'],
         context.bot_data['client_id']
     )
-    # Каждый раз в случае успешшного получения токена убираем предыдущее запланированное задание
+    # Каждый раз в случае успешного получения токена убираем предыдущее запланированное задание
     # и создаем новое с новым периодом обновленя
     context.bot_data['refreshing'].schedule_removal()
     context.bot_data['refreshing'] = context.job_queue.run_repeating(
@@ -271,10 +271,10 @@ def main():
     updater = Updater(tg_token)
     updater.dispatcher.bot_data['base_url'] = 'https://api.moltin.com'
     updater.dispatcher.bot_data['client_id'] = os.getenv('CLIENT_ID')
-    # В начале создаем задание по регулярному обновлению токена
+    # В начале создаем задание по регулярному обновлению токена с дефолтным периодом 120 секунд
     updater.dispatcher.bot_data['refreshing'] = updater.job_queue.run_repeating(
         refresh_token,
-        interval=10,
+        interval=120,
         first=1
         )
 
