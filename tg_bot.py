@@ -36,10 +36,10 @@ def start(update: Update, context: CallbackContext):
         chat_id=message.chat_id,
         message_id=message.message_id
     )
-    return 'INITIAL_CHOICE'
+    return 'PRODUCT_CHOICE'
 
 
-def button(update: Update, context: CallbackContext):
+def handle_product(update: Update, context: CallbackContext):
     query = update.callback_query
     if query.data == 'show_cart':
         return show_cart(update, context)
@@ -162,14 +162,14 @@ def show_cart(update: Update, context: CallbackContext):
 
 
 def payment(update: Update, context: CallbackContext):
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text='Пожалуйста, оставьте свою почту, чтобы мы связались с вами по оплате'
+    )
     message = update.effective_message
     context.bot.delete_message(
         chat_id=message.chat_id,
         message_id=message.message_id
-    )
-    context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text='Пожалуйста, оставьте свою почту, чтобы мы связались с вами по оплате'
     )
     return 'WAITING_EMAIL'
 
@@ -239,7 +239,7 @@ def user_input_handler(update: Update, context: CallbackContext):
 
     states_function = {
         'START': start,
-        'INITIAL_CHOICE': button,
+        'PRODUCT_CHOICE': handle_product,
         'HANDLE_MENU': handle_menu,
         'HANDLE_CART': handle_cart,
         'WAITING_EMAIL': get_email
@@ -252,20 +252,31 @@ def user_input_handler(update: Update, context: CallbackContext):
 
 
 def refresh_token(context: CallbackContext):
-    client_id = os.getenv('CLIENT_ID')
-    context.bot_data['store_token'] = get_auth_token(
+    context.bot_data['store_token'], context.bot_data['token_lifetime'] = get_auth_token(
         context.bot_data['base_url'],
-        client_id
+        context.bot_data['client_id']
     )
+    # Каждый раз в случае успешшного получения токена убираем предыдущее запланированное задание
+    # и создаем новое с новым периодом обновленя
+    context.bot_data['refreshing'].schedule_removal()
+    context.bot_data['refreshing'] = context.job_queue.run_repeating(
+        refresh_token,
+        interval=int(context.bot_data['token_lifetime']*0.9)
+        )
 
 
 def main():
     load_dotenv()
     tg_token = os.getenv('TG_TOKEN')
     updater = Updater(tg_token)
-    job_queue = updater.job_queue
     updater.dispatcher.bot_data['base_url'] = 'https://api.moltin.com'
-    job_queue.run_repeating(refresh_token, interval=3600, first=1)
+    updater.dispatcher.bot_data['client_id'] = os.getenv('CLIENT_ID')
+    # В начале создаем задание по регулярному обновлению токена
+    updater.dispatcher.bot_data['refreshing'] = updater.job_queue.run_repeating(
+        refresh_token,
+        interval=10,
+        first=1
+        )
 
     bot_commands = [
         ('start', 'Начать диалог')

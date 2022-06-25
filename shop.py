@@ -10,7 +10,11 @@ def get_auth_token(url, client_id):
     }
     response = requests.post(f'{url}/oauth/access_token', data=data)
     response.raise_for_status()
-    return f"Bearer {response.json().get('access_token')}"
+    auth_info = response.json()
+    return (
+        f"Bearer {auth_info.get('access_token')}",
+        auth_info.get('expires_in')
+    )
 
 
 def get_products(token, url, id=None):
